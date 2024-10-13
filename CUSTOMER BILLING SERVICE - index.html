@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Billing System</title>
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f4c75, #1b262b);
+            color: #ffffff;
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            text-align: center;
+        }
+        .container {
+            background-color: rgba(20, 30, 40, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            margin: 0 auto;
+            max-width: 600px;
+        }
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 
+                0 0 5px rgba(255, 0, 0, 0.8), 
+                0 0 10px rgba(0, 255, 0, 0.8), 
+                0 0 20px rgba(0, 0, 255, 0.8); /* RGB Neon effect */
+            animation: moveSideToSide 10s linear infinite; /* Move animation */
+        }
+        @keyframes moveSideToSide {
+            0% { transform: translateX(0); }
+            50% { transform: translateX(20px); }
+            100% { transform: translateX(0); }
+        }
+        h2, h3 {
+            color: #ff6347; /* Tomato color */
+            margin: 10px 0;
+            text-shadow: 
+                0 0 5px rgba(255, 0, 0, 0.8), 
+                0 0 10px rgba(0, 255, 0, 0.8), 
+                0 0 20px rgba(0, 0, 255, 0.8); /* RGB Neon effect */
+        }
+        input, button {
+            width: calc(100% - 20px);
+            padding: 15px;
+            margin: 5px 0;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        input {
+            background-color: #1f3a5f;
+            color: #ffffff;
+        }
+        button {
+            background-color: #007bff;
+            color: #ffffff;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .error {
+            color: #ff6f61;
+            font-weight: bold;
+        }
+        .success {
+            color: #32cd32;
+            font-weight: bold;
+        }
+        .history {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #003a5d;
+            border-radius: 5px;
+            text-align: left;
+            overflow-y: auto;
+            max-height: 150px;
+        }
+        .exit-button {
+            background-color: #dc3545; /* Red for exit button */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 id="dynamicTitle">Customer Billing System</h1>
+        <div>
+            <input type="text" id="customerName" placeholder="Enter customer name" onkeydown="if(event.key === 'Enter') addCustomer()" />
+            <h3 id="currentCustomer" style="display: none;"></h3>
+            <div id="customerActions" style="display: none;">
+                <h3 style="color: white;">Select Item:</h3>
+                <div id="itemList"></div>
+                <input type="number" id="itemSelection" placeholder="Select item number" onkeydown="if(event.key === 'Enter') processOrder()" />
+                <input type="number" id="quantity" placeholder="Enter quantity" onkeydown="if(event.key === 'Enter') processOrder()" />
+                <h3 style="color: white;">Do you want to add pearls? (1 for Yes, 2 for No)</h3>
+                <input type="number" id="addPearls" placeholder="1 for Yes, 2 for No" onkeydown="if(event.key === 'Enter') processOrder()" />
+                <button onclick="processOrder()">Submit Order</button>
+                <button onclick="showCustomerHistory()">View Order History</button>
+            </div>
+        </div>
+        <button onclick="editCustomerName()">Edit Current Customer Name</button>
+        <div id="commandSection" style="display: none;">
+            <input type="text" id="command" placeholder="Enter command (e.g., /help, /enday)" onkeydown="if(event.key === 'Enter') executeCommand()" />
+            <button onclick="executeCommand()">Execute Command</button>
+        </div>
+        <div class="history" id="customerHistorySection" style="display: none;">
+            <h2>Customer Order History</h2>
+            <pre id="customerOrderHistory"></pre>
+            <button class="exit-button" onclick="exitCustomerHistory()">Exit</button> <!-- Exit button -->
+        </div>
+        <div class="history" id="globalHistorySection" style="display: none;">
+            <h2>Daily Order History</h2>
+            <pre id="dailyOrderHistory"></pre>
+        </div>
+        <div id="result" class="success"></div>
+        <div id="error" class="error"></div>
+    </div>
+
+    <script>
+        const items = [
+            { number: 1, name: "Caramel Macchiato", price: 49 },
+            { number: 2, name: "Yogurt", price: 49 },
+            { number: 3, name: "Dark Choco", price: 49 },
+            { number: 4, name: "Strawberry", price: 49 },
+            { number: 5, name: "Star Latte", price: 49 },
+            { number: 6, name: "Star Black Hot Coffee", price: 49 },
+            { number: 7, name: "Hot Coffeccino", price: 49 }
+        ];
+        
+        let customers = {}; // Store customer orders
+        let currentCustomer = null; // Track the current customer
+        let dayCounter = 1; // Track days
+        let totalSales = 0; // Track total sales
+        let history = []; // Store daily summaries
+
+        function clearInputFields() {
+            document.getElementById('itemSelection').value = '';
+            document.getElementById('quantity').value = '';
+            document.getElementById('addPearls').value = '';
+        }
+
+        function addCustomer() {
+            const customerName = document.getElementById('customerName').value.trim();
+            if (!customerName) {
+                showError("Customer name cannot be empty.");
+                return;
+            }
+
+            // Check if the customer exists
+            if (!customers[customerName]) {
+                currentCustomer = customerName;
+                customers[currentCustomer] = []; // Initialize customer order history if not exists
+            } else {
+                currentCustomer = customerName; // Switch to existing customer
+            }
+
+            document.getElementById('currentCustomer').innerText = `Current Customer: ${currentCustomer}`;
+            document.getElementById('currentCustomer').style.display = 'block'; // Show current customer
+            document.getElementById('customerActions').style.display = 'block'; // Show actions for the customer
+            document.getElementById('commandSection').style.display = 'block'; // Show command section
+            showSuccess(`Welcome '${currentCustomer}'!`);
+
+            document.getElementById('customerName').value = ''; // Clear the customer name input
+            clearInputFields(); // Clear input fields
+            populateItems(); // Populate available items
+        }
+
+        function populateItems() {
+            const itemList = document.getElementById('itemList');
+            itemList.innerHTML = items.map(item => 
+                `<span style="color: white;">Item ${item.number}: ${item.name} - ₱${item.price}</span><br>`
+            ).join(''); // Display items
+        }
+
+        function processOrder() {
+            const itemSelection = parseInt(document.getElementById('itemSelection').value.trim());
+            const quantity = parseInt(document.getElementById('quantity').value.trim());
+            const addPearls = parseInt(document.getElementById('addPearls').value.trim());
+
+            if (!itemSelection || !quantity) {
+                showError("Please select an item and enter a quantity.");
+                return;
+            }
+
+            const selectedItem = items.find(item => item.number === itemSelection);
+            if (!selectedItem) {
+                showError("Invalid item selection.");
+                return;
+            }
+
+            const totalCost = selectedItem.price * quantity;
+            totalSales += totalCost; // Update total sales
+
+            customers[currentCustomer].push({ item: selectedItem.name, quantity, totalCost }); // Store order in history
+
+            // Show success message and clear inputs
+            showSuccess(`Order placed for ${selectedItem.name}: ₱${totalCost}`);
+            clearInputFields(); // Clear input fields
+
+            // Update customer order history display
+            displayCustomerOrderHistory();
+        }
+
+        function displayCustomerOrderHistory() {
+            const customerOrders = customers[currentCustomer];
+            const totalCost = customerOrders.reduce((sum, order) => sum + order.totalCost, 0);
+            const historyDisplay = customerOrders.length ? 
+                customerOrders.map(order => `${currentCustomer} ordered ${order.quantity} x ${order.item}: ₱${order.totalCost}`).join('\n') : 
+                `No orders found for ${currentCustomer}.`;
+
+            document.getElementById('customerOrderHistory').innerText = `${historyDisplay}\nTotal Cost: ₱${totalCost}`;
+            document.getElementById('customerHistorySection').style.display = 'block'; // Show customer history section
+        }
+
+        function exitCustomerHistory() {
+            document.getElementById('customerHistorySection').style.display = 'none'; // Hide customer history section
+        }
+
+        function editCustomerName() {
+            const newName = prompt("Enter new customer name:");
+            if (newName) {
+                if (customers[newName]) {
+                    showError("This customer name already exists.");
+                } else {
+                    customers[newName] = customers[currentCustomer]; // Copy existing orders to new name
+                    delete customers[currentCustomer]; // Remove old customer
+                    currentCustomer = newName; // Update current customer
+                    document.getElementById('currentCustomer').innerText = `Current Customer: ${currentCustomer}`;
+                    showSuccess(`Customer name changed to '${currentCustomer}'.`);
+                }
+            }
+        }
+
+        function endDay() {
+            let daySummary = `Day ${dayCounter}: Total Sales = ₱${totalSales}`;
+            if (totalSales < 100) {
+                daySummary += " - Not Profitable";
+                document.getElementById('result').classList.add('error');
+            } else {
+                document.getElementById('result').classList.remove('error');
+                document.getElementById('result').classList.add('success');
+            }
+            history.push(daySummary);
+            dayCounter++;
+            showSuccess(daySummary);
+            resetDailyCounters();
+            showGlobalHistory();
+        }
+
+        function resetDailyCounters() {
+            totalSales = 0; // Reset totalSales for the next day
+            currentCustomer = null; // Reset current customer
+            document.getElementById('currentCustomer').innerText = ''; // Clear current customer display
+            document.getElementById('customerActions').style.display = 'none'; // Hide customer actions
+            document.getElementById('commandSection').style.display = 'none'; // Hide command section
+            document.getElementById('customerHistorySection').style.display = 'none'; // Hide customer history section
+            clearInputFields(); // Clear input fields
+            customers = {}; // Reset customers for the next day
+        }
+
+        function showGlobalHistory() {
+            const dailyHistory = history.join('\n');
+            document.getElementById('dailyOrderHistory').innerText = dailyHistory || 'No history available.';
+            document.getElementById('globalHistorySection').style.display = 'block'; // Show global history section
+        }
+
+        function showError(message) {
+            document.getElementById('error').innerText = message;
+            document.getElementById('result').innerText = '';
+        }
+
+        function showSuccess(message) {
+            document.getElementById('result').innerText = message;
+            document.getElementById('error').innerText = '';
+        }
+
+        function executeCommand() {
+            const command = document.getElementById('command').value.trim();
+            if (command === '/enday') {
+                endDay();
+            } else if (command === '/history') {
+                showGlobalHistory();
+            } else if (command === '/help') {
+                showHelp();
+            } else {
+                showError("Unknown command. Type /help for a list of commands.");
+            }
+            document.getElementById('command').value = ''; // Clear command input
+        }
+
+        function showHelp() {
+            const helpMessage = "Available commands:\n/enday - End the day and summarize total sales.\n/history - Show order history.\n/help - Show this help message.";
+            alert(helpMessage);
+        }
+
+        // Color changing effect for specified text
+        const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'];
+        let currentColorIndex = 0;
+
+        function changeTextColor() {
+            const elementsToChange = [
+                document.getElementById('dynamicTitle'),
+                document.getElementById('currentCustomer'),
+                document.getElementById('addPearls')
+            ];
+
+            elementsToChange.forEach(element => {
+                if (element) {
+                    element.style.color = colors[currentColorIndex];
+                }
+            });
+            currentColorIndex = (currentColorIndex + 1) % colors.length;
+        }
+        setInterval(changeTextColor, 5000); // Change color every 5 seconds
+
+        // Populate initial item list on page load
+        window.onload = populateItems;
+    </script>
+</body>
+</html>
